@@ -1,0 +1,155 @@
+<html>
+	<head>
+		<meta charset="utf-8"/>
+</head>
+
+<body>
+<script src="https://d3js.org/d3.v5.min.js"></script>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+
+<script src="main.js"></script>
+
+<h4> Hyperparameters are given as follows</h4>
+
+
+<div>
+  <select id="preprocessing">
+    <option value="min-max">Min-Max</option>
+    <option value="standardization">Standardization</option>
+  </select>
+</div>
+
+
+<p>
+<label>C: 
+<input type="text" name="c" id="c" value=0 required>
+</label> 
+</p>
+
+<p>
+ <button id="plotButton" onclick="ROC();">
+ 	Generate ROC curve
+ </button>
+</p>
+
+<svg>
+</svg>
+
+
+
+
+
+
+</body>
+<script>
+// width and margin config
+var width = 500;
+var height = 500;
+var padding = 50;
+
+var margin = {
+	top: 25,
+	left: 25,
+	bottom: 25,
+	right: 25
+};
+
+
+var updateresults = function(preprocessing, c) {
+
+	d3.json("http://localhost:5000/" + preprocessing +"/" + c).then(function(response) {
+		if(response["status"] == "error") {
+		// displaying an error message if something is not right
+		return
+		}
+
+		// Generating a svg element
+		var svg = d3.select("svg")
+            		.attr("width", width)
+            		.attr("height", height);
+		
+				var xScale = d3.scaleLinear().domain([0, 1]).range([margin.left, width-margin.right]);
+		var yScale = d3.scaleLinear().domain([0, 1]).range([height-margin.bottom, margin.top]);
+
+				var xAxis = svg.append("g")
+               .attr("transform", `translate(0, ${height-margin.bottom})`)
+               .call(d3.axisBottom().scale(xScale));
+        var yAxis = svg.append("g")
+           .attr("transform",`translate(${margin.left}, 0)`)
+           .call(d3.axisLeft().scale(yScale));
+   		   
+        svg.append("text")
+            .attr("text-anchor", "middle")  // this makes it easy to centre the text as the transform is applied to the anchor
+            .attr("transform", "translate("+ (padding/2) +","+(height/2)+")rotate(-90)")  // text is drawn off the screen top left, move down and out and rotate
+            .text("TPR");
+        svg.append("text")
+            .attr("text-anchor", "middle")  // this makes it easy to centre the text as the transform is applied to the anchor
+            .attr("transform", "translate("+ (width/2) +","+(height-(padding/3))+")")  // centre below axis
+            .text("FPR");
+
+		// define the line
+		var valueline = d3.line()
+    		.x(function(d) { return xScale(d.fpr); })
+    		.y(function(d) { return yScale(d.tpr); });
+	
+		// add the line	
+        svg.append("path")
+        .attr("class", "line")
+        .attr("d", valueline(response));
+
+		// add the baseline (y=x) line
+        svg.append("line")
+           .style("stroke", "black")  
+           .style("stroke-dasharray", (5,5))
+           .attr("x1", xScale(0.0))
+           .attr("y1", yScale(0.0))
+           .attr("x2", xScale(1.0))
+           .attr("y2", yScale(1.0));
+        
+	});
+}
+
+// initial load with default values
+updateresults("std", "1.0");
+
+var updateData = function(preprocessing, c) {
+
+	d3.json("http://localhost:5000/" + preprocessing +"/" + c).then(function(response) {
+		console.log(response);
+		var svg = d3.select("svg").transition();
+
+		// scale
+		var xScale = d3.scaleLinear().domain([0, 1]).range([margin.left, width-margin.right]);
+		var yScale = d3.scaleLinear().domain([0, 1]).range([height-margin.bottom, margin.top]);
+
+		// define the line
+		var valueline = d3.line()
+				  .x(function(d) { return xScale(d.fpr); })
+				  .y(function(d) { return yScale(d.tpr); });
+
+		// add the line
+		svg.select(".line")
+		   .duration(750)
+		   .style("fill","none")
+		   .style("stroke", "blue")
+           .attr("d", valueline(response));		
+
+		// update auc
+
+	});
+
+}
+
+var ROC = function() {
+	
+	// validate parameters
+	if ($("#preprocessing")[0].checkValidity() && $("#c")[0].checkValidity()) {
+		preprocessing = $("#preprocessing").val();
+		c = parseFloat($("#c").val()).toFixed(3);
+		
+		// update the visualization
+		updateData(preprocessing, c);
+	}
+}
+</script>
+</html>
